@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InsulationMath - honest attic math</title>
+<style>
+  :root { --bg:#11151a; --card:#1a2129; --ink:#edf1f4; --dim:#97a6b2; --acc:#e0a458; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding:28px 24px 8px; max-width:980px; margin:0 auto; display:flex; justify-content:space-between; align-items:baseline; }
+  h1 { margin:0; font-size:28px; }
+  h1 span { color:var(--acc); }
+  nav a { color:var(--dim); text-decoration:none; font-size:14px; }
+  main { max-width:980px; margin:0 auto; padding:16px 24px 60px; display:grid; gap:18px; }
+  .card { background:var(--card); border-radius:14px; padding:20px; }
+  .card h2 { margin:0 0 12px; font-size:13px; letter-spacing:1.5px; color:var(--dim); text-transform:uppercase; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; }
+  label { display:block; font-size:13px; color:var(--dim); margin-bottom:4px; }
+  input, select { width:100%; background:#131920; border:1px solid #3a4a5a; color:var(--ink); border-radius:8px; padding:9px 10px; font-size:15px; }
+  .hint { font-size:12.5px; color:var(--dim); margin-top:10px; }
+  button { cursor:pointer; border:0; border-radius:9px; padding:11px 16px; font-size:15px; background:var(--acc); color:#2b1e0a; font-weight:600; }
+  button.ghost { background:#2e3a47; color:var(--ink); font-weight:500; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .verdict { font-size:17px; line-height:1.65; }
+  .verdict b { color:var(--acc); }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:16px; }
+  .stat { background:#131920; border-radius:10px; padding:12px; }
+  .stat .v { font-size:19px; font-weight:700; color:var(--acc); }
+  .stat .k { font-size:12px; color:var(--dim); margin-top:2px; }
+  .note { margin-top:14px; font-size:13.5px; color:var(--dim); }
+  .note b { color:var(--acc); font-weight:600; }
+  .rbar { height:26px; background:#131920; border-radius:8px; margin-top:14px; overflow:hidden; position:relative; }
+  .rbar .cur { position:absolute; left:0; top:0; bottom:0; background:#3a4a5a; }
+  .rbar .add { position:absolute; top:0; bottom:0; background:var(--acc); opacity:0.85; }
+  .rbar .lbl { position:absolute; right:10px; top:3px; font-size:12px; color:var(--ink); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Insulation<span>Math</span></h1>
+  <nav><a href="index.html">home</a></nav>
+</header>
+<main>
+  <section class="card">
+    <h2>The attic</h2>
+    <div class="grid">
+      <div><label>Attic area (sq ft)</label><input id="area" type="number" value="1000"></div>
+      <div><label>What is up there now</label><select id="material">
+        <option value="none">Bare / nothing</option>
+        <option value="batt" selected>Old fiberglass batts</option>
+        <option value="blownfg">Blown fiberglass</option>
+        <option value="cellulose">Blown cellulose</option>
+      </select></div>
+      <div><label>Current depth (inches)</label><input id="depth" type="number" step="0.5" value="3"></div>
+      <div><label>Climate band</label><select id="band">
+        <option value="south">South (target R-38)</option>
+        <option value="mid" selected>Middle (target R-49)</option>
+        <option value="north">North (target R-60)</option>
+      </select></div>
+      <div><label>Bag price (cellulose)</label><input id="bagPrice" type="number" step="0.01" value="15"></div>
+    </div>
+    <p class="hint">Rulers do not lie but labels do: old batts run about R-3.2 per inch, blown fiberglass R-2.5, cellulose R-3.5. What matters is depth, not the year on the wrapper.</p>
+    <div class="row">
+      <button id="run">Run the honest math</button>
+      <button class="ghost" data-preset="ranch">1960s ranch attic</button>
+      <button class="ghost" data-preset="bare">the bare attic</button>
+      <button class="ghost" data-preset="topup">northern top-up</button>
+    </div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <h2>The blow plan</h2>
+    <p class="verdict" id="verdictText"></p>
+    <div class="rbar"><div class="cur" id="barCur"></div><div class="add" id="barAdd"></div><div class="lbl" id="barLbl"></div></div>
+    <div class="stats" id="stats"></div>
+    <p class="note" id="advice"></p>
+  </section>
+
+  <section class="card">
+    <h2>Air sealing beats R-value</h2>
+    <p class="note">The gaps around can lights, hatches, and wire holes leak <b>more heat than missing inches of insulation</b> - and you cannot find them under 11 inches of new cellulose. Seal the attic floor first, keep the new depth <b>3 inches clear of soffit vents</b> with baffles, and know the rental truth: <b>the blower is free at 20 bags</b> at most big-box stores, so small jobs are worth pairing with a neighbor.</p>
+  </section>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var money = function (x) { return '$' + x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+
+  var PRESETS = {
+    ranch: { area: 1000, material: 'batt', depth: 3, band: 'mid' },
+    bare: { area: 600, material: 'none', depth: 0, band: 'south' },
+    topup: { area: 800, material: 'blownfg', depth: 8, band: 'north' }
+  };
+  document.querySelectorAll('[data-preset]').forEach(function (b) {
+    b.onclick = function () {
+      var p = PRESETS[b.dataset.preset];
+      Object.keys(p).forEach(function (k) { $(k).value = p[k]; });
+      run();
+    };
+  });
+
+  function run() {
+    var area = +$('area').value || 0;
+    if (area <= 0) { alert('Enter an attic area.'); return; }
+    var est = InsulationMath.estimate({
+      areaSqFt: area, material: $('material').value,
+      depthIn: +$('depth').value || 0, band: $('band').value,
+      bagPrice: +$('bagPrice').value || 15
+    });
+
+    $('verdictText').innerHTML = est.addR <= 0
+      ? 'You are at <b>R-' + est.currentR + '</b> against a target of R-' + est.targetR + ' - already there. Put the wallet away.'
+      : 'You are at <b>R-' + est.currentR + '</b>; the target is <b>R-' + est.targetR + '</b>. That is <b>' +
+        est.addInches + ' inches of blown cellulose</b>, or <b>' + est.bags + ' bags</b> at ' +
+        money(est.bagCost) + (est.blowerFree ? ' - and the blower rental is free at this count.' : ' - plus the blower rental, since free starts at 20 bags.');
+
+    var pct = function (r) { return Math.min(100, r / 60 * 100) + '%'; };
+    $('barCur').style.width = pct(est.currentR);
+    $('barAdd').style.left = pct(est.currentR);
+    $('barAdd').style.width = pct(Math.max(0, est.targetR - est.currentR));
+    $('barLbl').textContent = 'R-' + est.currentR + ' -> R-' + est.targetR;
+
+    var stats = [
+      { v: 'R-' + est.currentR, k: 'where you are' },
+      { v: 'R-' + est.targetR, k: 'where ' + $('band').value + ' should be' },
+      { v: est.addInches + '"', k: 'new cellulose depth' },
+      { v: est.bags, k: 'bags (R-' + est.bracket + ' chart row)' },
+      { v: money(est.bagCost), k: 'material cost' }
+    ];
+    $('stats').innerHTML = stats.map(function (x) {
+      return '<div class="stat"><div class="v">' + x.v + '</div><div class="k">' + x.k + '</div></div>';
+    }).join('');
+
+    $('advice').innerHTML = InsulationMath.advice(est, $('material').value);
+    $('result').hidden = false;
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  $('run').onclick = run;
+})();
+</script>
+</body>
+</html>
